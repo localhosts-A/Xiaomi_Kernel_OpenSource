@@ -749,9 +749,15 @@ void tcp_rcv_space_adjust(struct sock *sk)
 
 	trace_tcp_rcv_space_adjust(sk);
 
-	tcp_mstamp_refresh(tp);
+	if (unlikely(!tp->rcv_rtt_est.rtt_us))
+		return;
+
+	/* We do not refresh tp->tcp_mstamp here.
+	 * Some platforms have expensive ktime_get() implementations.
+	 * Using the last cached value is enough for DRS.
+	 */
 	time = tcp_stamp_us_delta(tp->tcp_mstamp, tp->rcvq_space.time);
-	if (time < (tp->rcv_rtt_est.rtt_us >> 3) || tp->rcv_rtt_est.rtt_us == 0)
+	if (time < (tp->rcv_rtt_est.rtt_us >> 3))
 		return;
 
 	/* Number of bytes copied to user in last RTT */
@@ -3289,7 +3295,7 @@ void tcp_rearm_rto(struct sock *sk)
 /* Try to schedule a loss probe; if that doesn't work, then schedule an RTO. */
 static void tcp_set_xmit_timer(struct sock *sk)
 {
-	if (!tcp_schedule_loss_probe(sk, true))
+	if (!tcp_sk(sk)->packets_out || !tcp_schedule_loss_probe(sk, true))
 		tcp_rearm_rto(sk);
 }
 

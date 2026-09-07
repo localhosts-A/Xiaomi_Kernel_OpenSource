@@ -4850,14 +4850,15 @@ static void napi_schedule_rps(struct softnet_data *sd)
 int netdev_flow_limit_table_len __read_mostly = (1 << 12);
 #endif
 
-static bool skb_flow_limit(struct sk_buff *skb, unsigned int qlen)
+static bool skb_flow_limit(struct sk_buff *skb, unsigned int qlen,
+			   int max_backlog)
 {
 #ifdef CONFIG_NET_FLOW_LIMIT
-	struct sd_flow_limit *fl;
-	struct softnet_data *sd;
 	unsigned int old_flow, new_flow;
+	const struct softnet_data *sd;
+	struct sd_flow_limit *fl;
 
-	if (qlen < (READ_ONCE(netdev_max_backlog) >> 1))
+	if (likely(qlen < (max_backlog >> 1)))
 		return false;
 
 	sd = this_cpu_ptr(&softnet_data);
@@ -4897,15 +4898,25 @@ static int enqueue_to_backlog(struct sk_buff *skb, int cpu,
 	struct softnet_data *sd;
 	unsigned long flags;
 	unsigned int qlen;
+	int max_backlog;
 
 	reason = SKB_DROP_REASON_NOT_SPECIFIED;
 	sd = &per_cpu(softnet_data, cpu);
 
+	if (unlikely(!netif_running(skb->dev)))
+		goto bad_dev;
+
+	qlen = skb_queue_len_lockless(&sd->input_pkt_queue);
+	max_backlog = READ_ONCE(netdev_max_backlog);
+	if (unlikely(qlen > max_backlog) ||
+	    skb_flow_limit(skb, qlen, max_backlog)) {
+		reason = SKB_DROP_REASON_CPU_BACKLOG;
+		goto bad_dev;
+	}
+
 	rps_lock_irqsave(sd, &flags);
-	if (!netif_running(skb->dev))
-		goto drop;
 	qlen = skb_queue_len(&sd->input_pkt_queue);
-	if (qlen <= READ_ONCE(netdev_max_backlog) && !skb_flow_limit(skb, qlen)) {
+	if (likely(qlen <= max_backlog)) {
 		if (qlen) {
 enqueue:
 			__skb_queue_tail(&sd->input_pkt_queue, skb);
@@ -4922,10 +4933,10 @@ enqueue:
 		goto enqueue;
 	}
 	reason = SKB_DROP_REASON_CPU_BACKLOG;
-
-drop:
-	sd->dropped++;
 	rps_unlock_irq_restore(sd, &flags);
+
+bad_dev:
+	sd->dropped++;
 
 	dev_core_stats_rx_dropped_inc(skb->dev);
 	kfree_skb_reason(skb, reason);
