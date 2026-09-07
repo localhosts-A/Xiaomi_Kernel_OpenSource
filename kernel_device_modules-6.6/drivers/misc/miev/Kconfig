@@ -1,0 +1,9 @@
+# SPDX-License-Identifier: GPL-2.0-only
+
+config MIEV
+	tristate "MiSight event provider"
+	default m
+	help
+	  Build the MiSight kernel event provider.  It implements the
+	  cdev_tevent_* ABI used by Xiaomi display, charger, audio and UFS
+	  diagnostics and exposes the resulting records through /dev/miev.

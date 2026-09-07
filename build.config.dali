@@ -1,0 +1,36 @@
+# SPDX-License-Identifier: GPL-2.0
+#
+# Standalone Dali mixed-build configuration.
+#
+# The MiCode device-module snapshot is kept under kernel_device_modules-6.6
+# and is consumed through the upstream GKI external Kconfig/Makefile hooks.
+
+KERNEL_DIR="."
+
+. ${ROOT_DIR}/${KERNEL_DIR}/build.config.common
+. ${ROOT_DIR}/${KERNEL_DIR}/build.config.aarch64
+
+DEVICE_MODULES_DIR="kernel_device_modules-6.6"
+DEVICE_MODULES_REL_DIR=$(realpath "${ROOT_DIR}/${DEVICE_MODULES_DIR}" \
+	--relative-to "${ROOT_DIR}/${KERNEL_DIR}")
+GKI_DEVICE_MODULES_REL_DIR=${DEVICE_MODULES_REL_DIR}
+KCONFIG_EXT_PREFIX=${DEVICE_MODULES_DIR}
+
+DEVICE_MODULES_PATH="\$(srctree)/\$(DEVICE_MODULES_REL_DIR)"
+DEVCIE_MODULES_INCLUDE="-I\$(DEVICE_MODULES_PATH)/include"
+GKI_DEVICE_MODULES_PATH=${DEVICE_MODULES_PATH}
+GKI_DEVCIE_MODULES_INCLUDE=${DEVCIE_MODULES_INCLUDE}
+
+DEFCONFIG=dali_gki_defconfig
+PRE_DEFCONFIG_CMDS="KCONFIG_CONFIG=${ROOT_DIR}/${KERNEL_DIR}/arch/arm64/configs/${DEFCONFIG} ${ROOT_DIR}/${KERNEL_DIR}/scripts/kconfig/merge_config.sh -m -r ${ROOT_DIR}/${KERNEL_DIR}/arch/arm64/configs/gki_defconfig ${ROOT_DIR}/${KERNEL_DIR}/${DEVICE_MODULES_DIR}/arch/arm64/configs/mgk_64_k66_defconfig ${ROOT_DIR}/${KERNEL_DIR}/${DEVICE_MODULES_DIR}/kernel/configs/dali.config"
+POST_DEFCONFIG_CMDS="rm -f ${ROOT_DIR}/${KERNEL_DIR}/arch/arm64/configs/${DEFCONFIG}"
+
+EXT_MODULES="
+${DEVICE_MODULES_DIR}
+vendor/mediatek/kernel_modules/sched_cus
+vendor/mediatek/kernel_modules/fpsgo_cus
+vendor/mediatek/kernel_modules/game_cus
+vendor/mediatek/kernel_modules/task_turbo_cus
+vendor/mediatek/kernel_modules/mtkcam/sched
+vendor/mediatek/kernel_modules/gpu
+"
