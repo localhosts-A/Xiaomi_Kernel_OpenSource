@@ -123,4 +123,34 @@ config ANDROID_WRAPFD
 	  file supporting ioctl API for file ownership that controls ability to
 	  map the file.
 
+config ANDROID_DSU_AVB_BYPASS
+	bool "Android first-stage AVB read-view bypass"
+	depends on BOOT_CONFIG && BLOCK && PROC_FS && TRACEPOINTS
+	default n
+	help
+	  Temporarily present an orange verified-boot state to PID 1 while it
+	  reads /proc/bootconfig during first-stage init, and mark the top-level
+	  vbmeta flags as verification-disabled in the returned read buffer.
+
+	  This is an explicit trust-model change for development kernels. It
+	  never writes vbmeta storage, does not modify SELinux boot parameters,
+	  does not write selinuxfs/enforce, and is disabled after PID 1 first
+	  execs /system/bin/init.
+
+config ANDROID_DSU_SELINUX_PERMISSIVE
+	bool "Android DSU first-stage SELinux permissive helper"
+	depends on PROC_FS && TRACEPOINTS
+	depends on SECURITY_SELINUX && SECURITY_SELINUX_DEVELOP
+	default n
+	help
+	  During the PID 1 selinux_setup window, detect the AOSP
+	  /metadata/gsi/dsu/booted marker and allow only that DSU boot to
+	  enter SELinux permissive mode. The helper injects a DSU-only
+	  androidboot.selinux=permissive bootconfig view and performs the
+	  state transition through the native SELinux update path.
+
+	  Normal boots without the DSU marker are not modified. The helper
+	  is built into the kernel and closes after second-stage init or a
+	  safety timeout; it does not require an init_boot loader.
+
 endmenu

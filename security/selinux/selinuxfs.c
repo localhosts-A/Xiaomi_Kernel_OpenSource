@@ -23,6 +23,7 @@
 #include <linux/mutex.h>
 #include <linux/namei.h>
 #include <linux/init.h>
+#include <linux/errno.h>
 #include <linux/string.h>
 #include <linux/security.h>
 #include <linux/major.h>
@@ -32,6 +33,7 @@
 #include <linux/uaccess.h>
 #include <linux/kobject.h>
 #include <linux/ctype.h>
+#include <linux/android_dsu_selinux.h>
 
 /* selinuxfs pseudo filesystem for exporting the security policy API.
    Based on the proc code and the fs/nfsd/nfsctl.c code. */
@@ -126,9 +128,55 @@ static ssize_t sel_read_enforce(struct file *filp, char __user *buf,
 {
 	char tmpbuf[TMPBUFLEN];
 	ssize_t length;
+	bool report_enforcing;
+
+	if (ppos && *ppos == 0 &&
+	    android_dsu_selinux_try_force_permissive()) {
+		int error;
+
+		error = -EAGAIN;
+		if (selinux_initialized()) {
+			bool old_value = enforcing_enabled();
+			bool new_value = false;
+
+			if (new_value == old_value) {
+				error = 0;
+			} else {
+				error = avc_has_perm(current_sid(), SECINITSID_SECURITY,
+						    SECCLASS_SECURITY,
+						    SECURITY__SETENFORCE, NULL);
+				if (!error) {
+					audit_log(audit_context(), GFP_KERNEL,
+						  AUDIT_MAC_STATUS,
+						  "enforcing=%d old_enforcing=%d auid=%u ses=%u"
+						  " enabled=1 old-enabled=1 lsm=selinux res=1",
+						  new_value, old_value,
+						  from_kuid(&init_user_ns,
+							    audit_get_loginuid(current)),
+						  audit_get_sessionid(current));
+					enforcing_set(new_value);
+					selnl_notify_setenforce(new_value);
+					selinux_status_update_setenforce(new_value);
+					call_blocking_lsm_notifier(LSM_POLICY_CHANGE, NULL);
+					selinux_ima_measure_state();
+				}
+			}
+		}
+
+		android_dsu_selinux_force_result(error);
+		if (error && error != -EAGAIN)
+			pr_err("android-dsu-selinux: permissive transition failed: %d\n",
+			       error);
+		else if (!error)
+			pr_info("android-dsu-selinux: DSU SELinux state set to permissive\n");
+	}
+
+	report_enforcing = enforcing_enabled();
+	if (android_dsu_selinux_report_enforcing())
+		report_enforcing = true;
 
 	length = scnprintf(tmpbuf, TMPBUFLEN, "%d",
-			   enforcing_enabled());
+			   report_enforcing);
 	return simple_read_from_buffer(buf, count, ppos, tmpbuf, length);
 }
 

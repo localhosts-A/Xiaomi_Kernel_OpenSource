@@ -19,6 +19,7 @@
 #include <linux/page_size_compat.h>
 #include <linux/splice.h>
 #include <linux/compat.h>
+#include <linux/android_dsu_avb.h>
 #include <linux/mount.h>
 #include <linux/fs.h>
 #include "internal.h"
@@ -450,6 +451,7 @@ EXPORT_SYMBOL_NS(kernel_read, ANDROID_GKI_VFS_EXPORT_ONLY);
 
 ssize_t vfs_read(struct file *file, char __user *buf, size_t count, loff_t *pos)
 {
+	loff_t start = pos ? *pos : 0;
 	ssize_t ret;
 
 	if (!(file->f_mode & FMODE_READ))
@@ -472,6 +474,7 @@ ssize_t vfs_read(struct file *file, char __user *buf, size_t count, loff_t *pos)
 	else
 		ret = -EINVAL;
 	if (ret > 0) {
+		android_dsu_avb_patch_vbmeta(file, buf, start, ret);
 		fsnotify_access(file);
 		add_rchar(current, ret);
 	}
