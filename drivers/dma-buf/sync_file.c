@@ -192,6 +192,10 @@ static __poll_t sync_file_poll(struct file *file, poll_table *wait)
 {
 	struct sync_file *sync_file = file->private_data;
 
+	/* Avoid waitqueue registration when the fence is already complete. */
+	if (dma_fence_is_signaled(sync_file->fence))
+		return EPOLLIN;
+
 	poll_wait(file, &sync_file->wq, wait);
 
 	if (list_empty(&sync_file->cb.node) &&

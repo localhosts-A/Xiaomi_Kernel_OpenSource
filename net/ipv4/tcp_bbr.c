@@ -322,6 +322,9 @@ static void bbr_save_cwnd(struct sock *sk)
 	struct tcp_sock *tp = tcp_sk(sk);
 	struct bbr *bbr = inet_csk_ca(sk);
 
+	if (unlikely(!bbr))
+		return;
+
 	if (bbr->prev_ca_state < TCP_CA_Recovery && bbr->mode != BBR_PROBE_RTT)
 		bbr->prior_cwnd = tcp_snd_cwnd(tp);  /* this cwnd is good enough */
 	else  /* loss recovery or BBR_PROBE_RTT have temporarily cut cwnd */
@@ -1090,6 +1093,9 @@ __bpf_kfunc static u32 bbr_undo_cwnd(struct sock *sk)
 {
 	struct bbr *bbr = inet_csk_ca(sk);
 
+	if (unlikely(!bbr))
+		return tcp_snd_cwnd(tcp_sk(sk));
+
 	bbr->full_bw = 0;   /* spurious slow-down; reset full pipe detection */
 	bbr->full_bw_cnt = 0;
 	bbr_reset_lt_bw_sampling(sk);
@@ -1099,6 +1105,11 @@ __bpf_kfunc static u32 bbr_undo_cwnd(struct sock *sk)
 /* Entering loss recovery, so save cwnd for when we exit or undo recovery. */
 __bpf_kfunc static u32 bbr_ssthresh(struct sock *sk)
 {
+	struct bbr *bbr = inet_csk_ca(sk);
+
+	if (unlikely(!bbr))
+		return tcp_sk(sk)->snd_ssthresh;
+
 	bbr_save_cwnd(sk);
 	return tcp_sk(sk)->snd_ssthresh;
 }

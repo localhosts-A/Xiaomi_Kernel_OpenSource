@@ -83,9 +83,9 @@ static inline bool z_erofs_put_shortlivedpage(struct page **pagepool,
 
 #define MNGD_MAPPING(sbi)	((sbi)->managed_cache->i_mapping)
 static inline bool erofs_page_is_managed(const struct erofs_sb_info *sbi,
-					 struct page *page)
+						 struct page *page)
 {
-	return page->mapping == MNGD_MAPPING(sbi);
+	return page_folio(page)->mapping == MNGD_MAPPING(sbi);
 }
 
 int z_erofs_fixup_insize(struct z_erofs_decompress_req *rq, const char *padbuf,

@@ -1859,14 +1859,14 @@ typedef enum {
  * Allow userspace to control policy on scanning the unevictable LRU for
  * compactable pages.
  */
-static int sysctl_compact_unevictable_allowed __read_mostly = CONFIG_COMPACT_UNEVICTABLE_DEFAULT;
+static int sysctl_compact_unevictable_allowed __read_mostly = 0;
 /*
  * Tunable for proactive compaction. It determines how
  * aggressively the kernel should compact memory in the
  * background. It takes values in the range [0, 100].
  */
 static unsigned int __read_mostly sysctl_compaction_proactiveness = 20;
-static int sysctl_extfrag_threshold = 500;
+static int sysctl_extfrag_threshold = 800;
 static int __read_mostly sysctl_compact_memory;
 
 static inline void

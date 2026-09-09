@@ -4009,7 +4009,7 @@ static void init_sb_info(struct f2fs_sb_info *sbi)
 	spin_lock_init(&sbi->gc_remaining_trials_lock);
 	atomic64_set(&sbi->current_atomic_write, 0);
 	sbi->max_lock_elapsed_time = MAX_LOCK_ELAPSED_TIME;
-	sbi->adjust_lock_priority = 0;
+	sbi->adjust_lock_priority = 1;
 	sbi->lock_duration_priority = F2FS_DEFAULT_TASK_PRIORITY;
 	sbi->critical_task_priority = F2FS_CRITICAL_TASK_PRIORITY;
 
@@ -5271,4 +5271,3 @@ MODULE_DESCRIPTION("Flash Friendly File System");
 MODULE_LICENSE("GPL");
 MODULE_IMPORT_NS(ANDROID_GKI_VFS_EXPORT_ONLY);
 MODULE_SOFTDEP("pre: crc32");
-

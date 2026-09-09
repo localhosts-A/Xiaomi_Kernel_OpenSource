@@ -31,7 +31,11 @@ SYM_FUNC_START(__pi_clear_page)
 	stnp	xzr, xzr, [x0, #16]
 	stnp	xzr, xzr, [x0, #32]
 	stnp	xzr, xzr, [x0, #48]
-	add	x0, x0, #64
+	stnp	xzr, xzr, [x0, #64]
+	stnp	xzr, xzr, [x0, #80]
+	stnp	xzr, xzr, [x0, #96]
+	stnp	xzr, xzr, [x0, #112]
+	add	x0, x0, #128
 	tst	x0, #(PAGE_SIZE - 1)
 	b.ne	2b
 	ret

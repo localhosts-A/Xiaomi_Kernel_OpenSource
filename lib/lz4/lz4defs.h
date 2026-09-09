@@ -183,12 +183,16 @@ static FORCE_INLINE void LZ4_wildCopy(void *dstPtr,
 	} while (d < e);
 }
 
-static FORCE_INLINE unsigned int LZ4_NbCommonBytes(register size_t val)
+static FORCE_INLINE unsigned int LZ4_NbCommonBytes(size_t val)
 {
 #if LZ4_LITTLE_ENDIAN
-	return __ffs(val) >> 3;
+	if (sizeof(val) == 8)
+		return __builtin_ctzll((U64)val) >> 3;
+	return __builtin_ctz((U32)val) >> 3;
 #else
-	return (BITS_PER_LONG - 1 - __fls(val)) >> 3;
+	if (sizeof(val) == 8)
+		return __builtin_clzll((U64)val) >> 3;
+	return __builtin_clz((U32)val) >> 3;
 #endif
 }
 
@@ -198,6 +202,18 @@ static FORCE_INLINE unsigned int LZ4_count(
 	const BYTE *pInLimit)
 {
 	const BYTE *const pStart = pIn;
+
+	/* Fast path for the first machine word, which is usually equal. */
+	if (likely(pIn < pInLimit - (STEPSIZE - 1))) {
+		size_t const diff = LZ4_read_ARCH(pMatch) ^ LZ4_read_ARCH(pIn);
+
+		if (!diff) {
+			pIn += STEPSIZE;
+			pMatch += STEPSIZE;
+		} else {
+			return LZ4_NbCommonBytes(diff);
+		}
+	}
 
 	while (likely(pIn < pInLimit - (STEPSIZE - 1))) {
 		size_t const diff = LZ4_read_ARCH(pMatch) ^ LZ4_read_ARCH(pIn);

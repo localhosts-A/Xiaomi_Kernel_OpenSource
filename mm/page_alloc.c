@@ -5897,12 +5897,10 @@ static int zone_batchsize(struct zone *zone)
 	int batch;
 
 	/*
-	 * The number of pages to batch allocate is either ~0.1%
-	 * of the zone or 1MB, whichever is smaller. The batch
-	 * size is striking a balance between allocation latency
-	 * and zone lock contention.
+	 * Scale the batch size for high-speed mobile memory, up to 2MB,
+	 * to reduce zone lock contention on multi-core allocations.
 	 */
-	batch = min(zone_managed_pages(zone) >> 10, SZ_1M / PAGE_SIZE);
+	batch = min(zone_managed_pages(zone) >> 10, SZ_2M / PAGE_SIZE);
 	batch /= 4;		/* We effectively *= 4 below */
 	if (batch < 1)
 		batch = 1;
@@ -5977,10 +5975,10 @@ static int zone_highsize(struct zone *zone, int batch, int cpu_online)
 	high = total_pages / nr_split_cpus;
 
 	/*
-	 * Ensure high is at least batch*4. The multiple is based on the
-	 * historical relationship between high and batch.
+	 * Keep enough pages in the per-CPU list to amortize refills when the
+	 * larger batch size is used.
 	 */
-	high = max(high, batch << 2);
+	high = max(high, batch << 3);
 
 	return high;
 #else

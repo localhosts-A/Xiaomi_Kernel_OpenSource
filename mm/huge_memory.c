@@ -65,7 +65,7 @@ unsigned long transparent_hugepage_flags __read_mostly =
 #ifdef CONFIG_TRANSPARENT_HUGEPAGE_MADVISE
 	(1<<TRANSPARENT_HUGEPAGE_REQ_MADV_FLAG)|
 #endif
-	(1<<TRANSPARENT_HUGEPAGE_DEFRAG_REQ_MADV_FLAG)|
+	(1<<TRANSPARENT_HUGEPAGE_DEFRAG_KSWAPD_FLAG)|
 	(1<<TRANSPARENT_HUGEPAGE_DEFRAG_KHUGEPAGED_FLAG)|
 	(1<<TRANSPARENT_HUGEPAGE_USE_ZERO_PAGE_FLAG);
 
@@ -645,12 +645,15 @@ static int __init hugepage_init_sysfs(struct kobject **hugepage_kobj)
 	int order;
 
 	/*
-	 * Default to setting PMD-sized THP to inherit the global setting and
-	 * disable all other sizes. powerpc's PMD_ORDER isn't a compile-time
-	 * constant so we have to do this here.
+	 * Default to setting PMD-sized THP to inherit the global setting.
+	 * Enable 64kB and 128kB anonymous mTHP by default, and leave
+	 * 256kB/512kB orders for madvise regions.
 	 */
-	if (!anon_orders_configured)
+	if (!anon_orders_configured) {
 		huge_anon_orders_inherit = BIT(PMD_ORDER);
+		huge_anon_orders_always = BIT(4) | BIT(5);
+		huge_anon_orders_madvise = BIT(6) | BIT(7);
+	}
 
 	*hugepage_kobj = kobject_create_and_add("transparent_hugepage", mm_kobj);
 	if (unlikely(!*hugepage_kobj)) {

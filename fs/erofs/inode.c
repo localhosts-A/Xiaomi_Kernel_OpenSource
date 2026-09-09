@@ -276,6 +276,7 @@ static int erofs_fill_inode(struct inode *inode)
 		goto out_unlock;
 	}
 
+	mapping_set_large_folios(inode->i_mapping);
 	if (erofs_inode_is_data_compressed(vi->datalayout)) {
 #ifdef CONFIG_EROFS_FS_ZIP
 		if (!erofs_is_fscache_mode(inode->i_sb)) {
@@ -283,19 +284,19 @@ static int erofs_fill_inode(struct inode *inode)
 				  erofs_info, inode->i_sb,
 				  "EXPERIMENTAL EROFS subpage compressed block support in use. Use at your own risk!");
 			inode->i_mapping->a_ops = &z_erofs_aops;
-			err = 0;
-			goto out_unlock;
+		} else {
+			err = -EOPNOTSUPP;
 		}
-#endif
+#else
 		err = -EOPNOTSUPP;
-		goto out_unlock;
-	}
-	inode->i_mapping->a_ops = &erofs_raw_access_aops;
-	mapping_set_large_folios(inode->i_mapping);
-#ifdef CONFIG_EROFS_FS_ONDEMAND
-	if (erofs_is_fscache_mode(inode->i_sb))
-		inode->i_mapping->a_ops = &erofs_fscache_access_aops;
 #endif
+	} else {
+		inode->i_mapping->a_ops = &erofs_raw_access_aops;
+#ifdef CONFIG_EROFS_FS_ONDEMAND
+		if (erofs_is_fscache_mode(inode->i_sb))
+			inode->i_mapping->a_ops = &erofs_fscache_access_aops;
+#endif
+	}
 
 out_unlock:
 	erofs_put_metabuf(&buf);
