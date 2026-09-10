@@ -42,3 +42,10 @@ zstd_common-y := \
 		common/error_private.o \
 		common/fse_decompress.o \
 		common/zstd_common.o \
+
+# Keep compression and common code at the kernel-wide optimization level.
+# The decompression path is latency-sensitive for EROFS and ZRAM reads, so
+# apply the stronger optimizer only to its hot decode units.
+CFLAGS_decompress/huf_decompress.o += -O3
+CFLAGS_decompress/zstd_decompress.o += -O3
+CFLAGS_decompress/zstd_decompress_block.o += -O3

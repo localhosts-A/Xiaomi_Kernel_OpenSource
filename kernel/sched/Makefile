@@ -13,7 +13,11 @@ KCOV_INSTRUMENT := n
 KCSAN_SANITIZE := n
 KCSAN_INSTRUMENT_BARRIERS := y
 
-ifneq ($(CONFIG_SCHED_OMIT_FRAME_POINTER),y)
+ifeq ($(DALI_SCHED_OMIT_FRAME_POINTER),y)
+# arm64 does not define the generic SCHED_OMIT_FRAME_POINTER Kconfig symbol,
+# but the scheduler hot path does not require a frame pointer on this target.
+CFLAGS_core.o := $(PROFILING) -fomit-frame-pointer
+else ifneq ($(CONFIG_SCHED_OMIT_FRAME_POINTER),y)
 # According to Alan Modra <alan@linuxcare.com.au>, the -fno-omit-frame-pointer is
 # needed for x86 only.  Why this used to be enabled for all architectures is beyond
 # me.  I suspect most platforms don't need this, but until we know that for sure
