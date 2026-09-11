@@ -174,11 +174,28 @@ static inline u32 zram_get_priority(struct zram *zram, u32 index)
 	return prio & ZRAM_COMP_PRIORITY_MASK;
 }
 
-static void zram_accessed(struct zram *zram, u32 index)
+/* Caller must hold the corresponding slot lock when this helper is used. */
+static void zram_accessed_locked(struct zram *zram, u32 index)
 {
 	zram_clear_flag(zram, index, ZRAM_IDLE);
 #ifdef CONFIG_ZRAM_TRACK_ENTRY_ACTIME
 	zram->table[index].ac_time = ktime_get_boottime();
+#endif
+}
+
+static void zram_accessed(struct zram *zram, u32 index)
+{
+#ifdef CONFIG_ZRAM_TRACK_ENTRY_ACTIME
+	zram_slot_lock(zram, index);
+	zram_accessed_locked(zram, index);
+	zram_slot_unlock(zram, index);
+#else
+	/* Avoid taking the slot lock for the common already-active case. */
+	if (zram_test_flag(zram, index, ZRAM_IDLE)) {
+		zram_slot_lock(zram, index);
+		zram_accessed_locked(zram, index);
+		zram_slot_unlock(zram, index);
+	}
 #endif
 }
 
@@ -203,17 +220,27 @@ static inline void zram_fill_page(void *ptr, unsigned long len,
 
 static bool page_same_filled(void *ptr, unsigned long *element)
 {
-	unsigned long *page;
-	unsigned long val;
-	unsigned int pos, last_pos = PAGE_SIZE / sizeof(*page) - 1;
+	unsigned long *page = (unsigned long *)ptr;
+	unsigned long val = page[0];
+	unsigned int pos;
+	unsigned int const nr_words = PAGE_SIZE / sizeof(unsigned long);
 
-	page = (unsigned long *)ptr;
-	val = page[0];
-
-	if (val != page[last_pos])
+	/* Fast multi-point sampling to short-circuit non-identical pages. */
+	if (val != page[nr_words - 1] ||
+	    val != page[nr_words / 2] ||
+	    val != page[nr_words / 4] ||
+	    val != page[3 * nr_words / 4])
 		return false;
 
-	for (pos = 1; pos < last_pos; pos++) {
+	for (pos = 1; pos + 3 < nr_words; pos += 4) {
+		if (val != page[pos] ||
+		    val != page[pos + 1] ||
+		    val != page[pos + 2] ||
+		    val != page[pos + 3])
+			return false;
+	}
+
+	for (; pos < nr_words; pos++) {
 		if (val != page[pos])
 			return false;
 	}
@@ -1932,9 +1959,7 @@ static void zram_bio_read(struct zram *zram, struct bio *bio)
 		}
 		flush_dcache_page(bv.bv_page);
 
-		zram_slot_lock(zram, index);
 		zram_accessed(zram, index);
-		zram_slot_unlock(zram, index);
 
 		bio_advance_iter_single(bio, &iter, bv.bv_len);
 	} while (iter.bi_size);
@@ -1962,9 +1987,7 @@ static void zram_bio_write(struct zram *zram, struct bio *bio)
 			break;
 		}
 
-		zram_slot_lock(zram, index);
 		zram_accessed(zram, index);
-		zram_slot_unlock(zram, index);
 
 		bio_advance_iter_single(bio, &iter, bv.bv_len);
 	} while (iter.bi_size);

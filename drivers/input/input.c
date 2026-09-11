@@ -395,12 +395,17 @@ void input_handle_event(struct input_dev *dev,
 			unsigned int type, unsigned int code, int value)
 {
 	int disposition;
+	bool touch_coordinate;
 
 	lockdep_assert_held(&dev->event_lock);
 
 	disposition = input_get_disposition(dev, type, code, &value);
 	if (disposition != INPUT_IGNORE_EVENT) {
-		if (type != EV_SYN)
+		touch_coordinate = type == EV_ABS &&
+			test_bit(INPUT_PROP_DIRECT, dev->propbit) &&
+			(code == ABS_MT_POSITION_X || code == ABS_MT_POSITION_Y);
+		/* Skip entropy hashing only for high-frequency direct-touch coordinates. */
+		if (type != EV_SYN && !touch_coordinate)
 			add_input_randomness(type, code, value);
 
 		input_event_dispose(dev, disposition, type, code, value);
